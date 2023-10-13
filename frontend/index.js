@@ -1,32 +1,78 @@
+// Function to fetch tasks from the backend
+async function fetchTasks() {
+    try {
+        const response = await fetch('http://localhost:3000/tasks'); // Replace with your backend URL
+        const tasks = await response.json();
+
+        const taskList = document.getElementById("taskList");
+        taskList.innerHTML = ""; // Clear the existing list
+
+        tasks.forEach(task => {
+            const newTaskItem = document.createElement("li");
+            newTaskItem.className = "task-item";
+            newTaskItem.innerHTML = `
+                <span>${task}</span>
+                <button onclick="editTask(this)">Edit</button>
+                <button onclick="removeTask(this)">Delete</button>
+            `;
+            taskList.appendChild(newTaskItem);
+        });
+    } catch (error) {
+        console.error('Error fetching tasks:', error);
+    }
+}
+
 // Function to add a new task
-function addTask() {
+async function addTask() {
     const taskInput = document.getElementById("taskInput");
     const taskText = taskInput.value.trim();
 
     if (taskText !== "") {
-        const taskList = document.getElementById("taskList");
-        const newTaskItem = document.createElement("li");
-        newTaskItem.className = "task-item";
-        newTaskItem.innerHTML = `
-            <span>${taskText}</span>
-            <button onclick="removeTask(this)">Delete</button>
-        `;
-        taskList.appendChild(newTaskItem);
+        try {
+            await fetch('http://localhost:3000/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ task: taskText }),
+            });
 
-        // Clear the input field
-        taskInput.value = "";
+            taskInput.value = ""; // Clear the input field
+            fetchTasks(); // Refresh the task list
+        } catch (error) {
+            console.error('Error adding task:', error);
+        }
     }
 }
 
 // Function to remove a task
-function removeTask(button) {
+async function removeTask(button) {
     const taskItem = button.parentElement;
-    taskItem.remove();
+    const taskText = taskItem.querySelector('span').innerText;
+
+    try {
+        const response = await fetch('http://localhost:3000/tasks', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ task: taskText }),
+        });
+
+        if (response.status === 200) {
+            taskItem.remove(); // Remove the task from the DOM
+        } else {
+            console.error('Error deleting task:', response.statusText);
+        }
+    } catch (error) {
+        console.error('Error deleting task:', error);
+    }
 }
+
 
 // Function to edit a task
 function editTask(span) {
-    const taskText = span.innerText;
+    const taskText = span.parentElement.querySelector('span').innerText;
     const editedTaskInput = document.getElementById("editedTask");
     editedTaskInput.value = taskText;
 
@@ -36,15 +82,27 @@ function editTask(span) {
 
     // Handle save edited task
     const saveEditedTaskButton = document.getElementById("saveEditedTask");
-    saveEditedTaskButton.onclick = function () {
+    saveEditedTaskButton.onclick = async function () {
         const editedTask = editedTaskInput.value.trim();
         if (editedTask !== "") {
-            span.innerText = editedTask;
-            editTaskModal.style.display = "none";
+            const response = await fetch(`http://localhost:3000/tasks/`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ editedTask: editedTask }),
+            });
+
+            if (response.status === 200) {
+                span.innerText = editedTask;
+                editTaskModal.style.display = "none";
+            } else {
+                console.error('Error editing task:', response.statusText);
+            }
         }
     };
 
-    // Close the modal
+    // Handle cancel action
     const closeModal = document.getElementById("closeModal");
     closeModal.onclick = function () {
         editTaskModal.style.display = "none";
@@ -58,15 +116,9 @@ function editTask(span) {
     };
 }
 
-// Add a task when the "Add Task" button is clicked
+// Add an event listener to fetch tasks when the page loads
+window.addEventListener("load", fetchTasks);
+
+// Add an event listener to add tasks
 const addTaskButton = document.getElementById("addTaskButton");
 addTaskButton.addEventListener("click", addTask);
-
-// Add event listeners for editing and deleting tasks
-document.addEventListener("click", function (event) {
-    if (event.target.tagName === "SPAN") {
-        editTask(event.target);
-    } else if (event.target.tagName === "BUTTON" && event.target.innerText === "Delete") {
-        removeTask(event.target);
-    }
-});
